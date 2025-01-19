@@ -1,26 +1,18 @@
-# Login to Azure
-Connect-AzAccount
+# Install required Windows features
+Install-WindowsFeature -Name Web-Server, DHCP, Windows-Server-Backup -IncludeManagementTools
 
-# Create Resource Group
-$resourceGroupName = "WinServer2019-RG"
-New-AzResourceGroup -Name $resourceGroupName -Location "australiaeast"
+# Configure DHCP server
+Add-DhcpServerv4Scope -Name "Default Scope" -StartRange 192.168.1.100 -EndRange 192.168.1.200 -SubnetMask 255.255.255.0
 
-# Deploy the template
-$templateFile = "server2019-deployment.json"
-$deploymentName = "WinServer2019Deployment-" + (Get-Date).ToString("yyyyMMdd-HHmmss")
+# Enable DHCP server
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\DHCPServer" -Name Start -Value 2
 
-# Replace with your script's actual URL
-$scriptUri = "https://your-storage-account.blob.core.windows.net/scripts/install-features.ps1"
+# Create a backup configuration
+$backupTarget = New-WBBackupTarget -VolumePath "C:"
+$policy = New-WBPolicy
+Add-WBSystemState -Policy $policy
+Add-WBBackupTarget -Policy $policy -Target $backupTarget
 
-$params = @{
-    vmName = "WinServer2019"
-    adminUsername = "adminron"
-    adminPassword = (ConvertTo-SecureString -String "qwerty654321!" -AsPlainText -Force)
-    scriptFileUri = $scriptUri
-}
-
-New-AzResourceGroupDeployment `
-    -Name $deploymentName `
-    -ResourceGroupName $resourceGroupName `
-    -TemplateFile $templateFile `
-    -TemplateParameterObject $params
+# Write completion status to a log file
+$logFile = "C:\Windows\Temp\feature-installation.log"
+Add-Content -Path $logFile -Value "Installation completed at $(Get-Date)"
